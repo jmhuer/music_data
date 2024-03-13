@@ -40,6 +40,7 @@ def process_songs_from_csv(driver, filename):
         next(song_reader, None)  # This skips the header row
         for row in song_reader:
             song_url = row[2]  # The URL is the VIP guest to greet
+            song_url = song_url.replace("openBandEditorOnInit=true", "openBandEditorOnInit=false")
             driver.get(song_url)
             sleep(3)
             save_file(driver)
