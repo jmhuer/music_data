@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: An AWS Serverless Application that receives and responds to SMS messages.
+Resources:
+  ReceiveAndRespondSMS:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 60  # Add this line
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: 
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:118680662635:secret:chatgpt-ZoqMgn # Replace xxxxx with the actual secret version id if necessary.
+        - AmazonS3FullAccess
+      Events:
+        Sms:
+          Type: Api
+          Properties:
+            Path: /sms
+            Method: post
+    Metadata:
+      AWS::Serverless::Function:
+        CodeUri: .
+        Pipfile: requirements.txt
+      AWS::ServerlessRepo::Application:
+        Name: TwilioDependency
+        SemanticVersion: 1.0.0
+      SamResourceId: ReceiveAndRespondSMS
