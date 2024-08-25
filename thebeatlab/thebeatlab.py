@@ -73,23 +73,57 @@ class RecordStore:
 
         return chords, notes, song
 
-    def find_best_match(self, artist, songname, sectiontype):
-        # Find the closest match for the artist, songname, and sectiontype
-        best_artist = get_close_matches(artist, self.data['artist'], n=1, cutoff=0.6)
-        best_songname = get_close_matches(songname, self.data['songname'], n=1, cutoff=0.6)
-        best_sectiontype = get_close_matches(sectiontype, self.data['sectiontype'], n=1, cutoff=0.6)
+    def find_best_match(self, artist=None, songname=None, sectiontype=None):
+        # Prioritize exact matches if all fields are provided
+        if artist and songname and sectiontype:
+            match = self.data[
+                (self.data['artist'] == artist) &
+                (self.data['songname'] == songname) &
+                (self.data['sectiontype'] == sectiontype)
+            ]
+            if not match.empty:
+                return match.iloc[0]['filename']
+        
+        # Use difflib to find the closest match if exact match isn't found
+        best_artist = get_close_matches(artist, self.data['artist'], n=1, cutoff=0.6) if artist else []
+        best_songname = get_close_matches(songname, self.data['songname'], n=1, cutoff=0.6) if songname else []
+        best_sectiontype = get_close_matches(sectiontype, self.data['sectiontype'], n=1, cutoff=0.6) if sectiontype else []
 
+        # Try to find the best possible match based on available fields
+        match = None
         if best_artist and best_songname and best_sectiontype:
             match = self.data[
                 (self.data['artist'] == best_artist[0]) &
                 (self.data['songname'] == best_songname[0]) &
                 (self.data['sectiontype'] == best_sectiontype[0])
             ]
-            if not match.empty:
-                return match.iloc[0]['filename']  # Return the filename of the best match
+        elif best_artist and best_songname:
+            match = self.data[
+                (self.data['artist'] == best_artist[0]) &
+                (self.data['songname'] == best_songname[0])
+            ]
+        elif best_artist and best_sectiontype:
+            match = self.data[
+                (self.data['artist'] == best_artist[0]) &
+                (self.data['sectiontype'] == best_sectiontype[0])
+            ]
+        elif best_songname and best_sectiontype:
+            match = self.data[
+                (self.data['songname'] == best_songname[0]) &
+                (self.data['sectiontype'] == best_sectiontype[0])
+            ]
+        elif best_artist:
+            match = self.data[self.data['artist'] == best_artist[0]]
+        elif best_songname:
+            match = self.data[self.data['songname'] == best_songname[0]]
+        elif best_sectiontype:
+            match = self.data[self.data['sectiontype'] == best_sectiontype[0]]
+
+        if match is not None and not match.empty:
+            return match.iloc[0]['filename']  # Return the filename of the best match
         return None
 
-    def get_song(self, artist, songname, sectiontype):
+    def get_song(self, artist=None, songname=None, sectiontype=None):
         # Get the best match for the provided artist, songname, and sectiontype
         filename = self.find_best_match(artist, songname, sectiontype)
         if filename:
