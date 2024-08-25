@@ -306,10 +306,16 @@ class Player:
     def play_piano(self, fs=16000):
         return IPython.display.Audio(self.pm.synthesize(fs=fs), rate=fs)
 
+#Define your structured output model
+class SongRequest(BaseModel):
+    artist: str
+    songname: str
+    sectiontype: str
 
 class DJ:
     def __init__(self, record_store: RecordStore, authenticate=False, api_key_file='openaikey.txt'):
         self.record_store = record_store
+        self.player = None
         if authenticate:
             self.authenticate(api_key_file)
 
@@ -370,19 +376,3 @@ class DJ:
             print("No matching song found.")
             return None
 
-    def play_song(self, song: Song):
-        if song:
-            player = Player(bpm=85, instrument_program=42)
-            player.load_song(song)
-            audio = player.play_piano()
-            return audio
-        else:
-            print("No song to play.")
-            return None
-
-
-# Define your structured output model
-class SongRequest(BaseModel):
-    artist: str
-    songname: str
-    sectiontype: str
