@@ -2,6 +2,9 @@ import os
 import json
 import pandas as pd
 from difflib import get_close_matches
+import openai
+from pydantic import BaseModel
+
 
 class RecordStore:
     def __init__(self, overall_csv_file, data_directory='data/'):
@@ -302,3 +305,84 @@ class Player:
 
     def play_piano(self, fs=16000):
         return IPython.display.Audio(self.pm.synthesize(fs=fs), rate=fs)
+
+
+class DJ:
+    def __init__(self, record_store: RecordStore, authenticate=False, api_key_file='openaikey.txt'):
+        self.record_store = record_store
+        if authenticate:
+            self.authenticate(api_key_file)
+
+    def authenticate(self, api_key_file: str):
+        # Read the API key from the file
+        with open(api_key_file, 'r') as file:
+            api_key = file.read().strip()  # Read and strip any surrounding whitespace/newlines
+        
+        # Export the API key as an environment variable
+        os.environ['OPENAI_API_KEY'] = api_key
+        openai.api_key = api_key  # Set the API key for the OpenAI client
+
+        # Optionally, print a message to confirm that the key has been set
+        print("OpenAI API key has been set and authenticated.")
+
+    def process_request(self, input_text: str) -> Song:
+        # System message to instruct the model on how to behave
+        system_message = {
+            "role": "system",
+            "content": (
+                "You are a helpful assistant. When given a request for a song, "
+                "you should attempt to understand the artist, song name, and section type, "
+                "even if the user makes a typo or uses a non-standard name. Correct obvious mistakes "
+                "and extract the correct structured data."
+            )
+        }
+
+        # Define the messages including the system message and user input
+        messages = [
+            system_message,
+            {"role": "user", "content": input_text},
+        ]
+
+        # Create an OpenAI client instance
+        client = openai.OpenAI()
+
+        # Call the OpenAI API to get structured output
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-2024-08-06",
+            messages=messages,
+            response_format=SongRequest,  # Use the Pydantic model directly here
+        )
+
+        # Extract the structured response content
+        song_request = completion.choices[0].message.parsed
+
+        # Use the extracted information to retrieve the song from the RecordStore
+        song = self.record_store.get_song(
+            artist=song_request.artist,
+            songname=song_request.songname,
+            sectiontype=song_request.sectiontype
+        )
+
+        if song:
+            print("Song object loaded successfully.")
+            return song
+        else:
+            print("No matching song found.")
+            return None
+
+    def play_song(self, song: Song):
+        if song:
+            player = Player(bpm=85, instrument_program=42)
+            player.load_song(song)
+            audio = player.play_piano()
+            return audio
+        else:
+            print("No song to play.")
+            return None
+
+
+# Define your structured output model
+class SongRequest(BaseModel):
+    artist: str
+    songname: str
+    sectiontype: str
