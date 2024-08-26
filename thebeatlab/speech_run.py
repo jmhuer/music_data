@@ -23,15 +23,19 @@ class SpeechDJ:
         self.mute_threshold = 5
         self.mute_duration_threshold = 10
 
-        self.model = whisper.load_model("base")  # Load Whisper model
-        # Load the model
-
-        # Check if CUDA is available and move the model to GPU if it is
+        self.model = whisper.load_model("base")
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
             print("Model moved to GPU.")
         else:
             print("CUDA is not available. Model is running on CPU.")
+        
+        self.record_store = RecordStore(overall_csv_file)
+        self.dj = DJ(self.record_store, authenticate=authenticate, api_key_file=api_key_file)
+        self.p = pyaudio.PyAudio()
+
+        self.current_playback_thread = None  # Track the current playback thread
+        self.current_play_obj = None  # Track the current PlayObject
         self.record_store = RecordStore(overall_csv_file)  # Initialize the RecordStore
         self.dj = DJ(self.record_store, authenticate=authenticate, api_key_file=api_key_file)  # Initialize the DJ
         self.p = pyaudio.PyAudio()  # Initialize PyAudio
@@ -145,16 +149,28 @@ class SpeechDJ:
 
 
     def play_audio_in_background(self, filename):
-        # This method starts the audio playback in a separate thread
+        # Stop current playback if any
+        if self.current_playback_thread and self.current_playback_thread.is_alive():
+            print("Stopping current audio playback before starting new one.")
+            self.stop_current_audio_playback()
+        
+        # Start new playback
         thread = threading.Thread(target=self.play_audio, args=(filename,))
+        self.current_playback_thread = thread
         thread.start()
         return thread
 
+    def stop_current_audio_playback(self):
+        if self.current_play_obj:
+            self.current_play_obj.stop()  # Stop the audio
+            self.current_play_obj = None
+
     def play_audio(self, filename):
-        # Use simpleaudio to play the audio file
         wave_obj = sa.WaveObject.from_wave_file(filename)
         play_obj = wave_obj.play()
+        self.current_play_obj = play_obj  # Store the reference to stop it later
         play_obj.wait_done()  # Wait until playback is finished
+        self.current_play_obj = None  # Clear the reference after playback finishes
 
     def converse(self, filename, input_device_index, save_last_audio=False):
         stream = self.open_stream(input_device_index)
@@ -186,6 +202,7 @@ class SpeechDJ:
                         print("Saving audio...")
                         self.save_audio(filename, frames)
                     print("Finished recording. Processing audio...")
+                    
 
                     # # Downsample the recorded audio
                     # downsampled_audio = self.downsample_audio(frames)
@@ -215,6 +232,7 @@ class SpeechDJ:
                                 wf.writeframes(audio.data)
 
                             # Play the song in the background while continuing the loop
+                            ##BEFORE PLAYING NEW AUDIO  - STOP ANY AUDIO THAT IS CURRENTLY PLAYING IN OTHER THREAD
                             self.play_audio_in_background(song_filename)
 
                     # Restart stream process
