@@ -6,21 +6,32 @@ import openai
 import simpleaudio as sa
 from pydantic import BaseModel
 import threading
-
+import numpy as np
 from .thebeatlab import Chord, Note, Song, RecordStore, Player, DJ
 from . import alsa_suppress  # This suppresses ALSA warnings globally
 import pyaudio  # Your existing PyAudio imports and initialization
+import torch
+from scipy.signal import resample
 
 class SpeechDJ:
-    def __init__(self, overall_csv_file, authenticate=False, api_key_file='openaikey.txt'):
+    def __init__(self, overall_csv_file, authenticate=False, api_key_file='openaikey.txt', downsample_rate=16000):
         self.chunk = 2048 * 2
         self.sample_format = pyaudio.paInt16
         self.channels = 1
         self.sample_rate = 44100
+        self.downsample_rate = downsample_rate  # The target downsample rate
         self.mute_threshold = 5
         self.mute_duration_threshold = 10
 
         self.model = whisper.load_model("base")  # Load Whisper model
+        # Load the model
+
+        # Check if CUDA is available and move the model to GPU if it is
+        if torch.cuda.is_available():
+            self.model = self.model.to("cuda")
+            print("Model moved to GPU.")
+        else:
+            print("CUDA is not available. Model is running on CPU.")
         self.record_store = RecordStore(overall_csv_file)  # Initialize the RecordStore
         self.dj = DJ(self.record_store, authenticate=authenticate, api_key_file=api_key_file)  # Initialize the DJ
         self.p = pyaudio.PyAudio()  # Initialize PyAudio
@@ -61,14 +72,6 @@ class SpeechDJ:
         wf.writeframes(b"".join(frames))
         wf.close()
 
-    def open_stream(self, input_device_index):
-        return self.p.open(format=self.sample_format,
-                           channels=self.channels,
-                           rate=self.sample_rate,
-                           input=True,
-                           frames_per_buffer=self.chunk,
-                           input_device_index=input_device_index)
-
     def process_audio(self, frames):
         frames_per_30_sec = 30 * self.sample_rate // self.chunk
         texts = []
@@ -81,6 +84,65 @@ class SpeechDJ:
             result = whisper.decode(self.model, mel, options)
             texts.append(result.text)
         return " ".join(texts)
+    def open_stream(self, input_device_index):
+        return self.p.open(format=self.sample_format,
+                           channels=self.channels,
+                           rate=self.sample_rate,
+                           input=True,
+                           frames_per_buffer=self.chunk,
+                           input_device_index=input_device_index)
+
+    def downsample_audio(self, frames, filename="downsampled_audio.wav"):
+        # Combine all frames into a single numpy array
+        audio_data = np.hstack([np.frombuffer(frame, dtype=np.int16) for frame in frames])
+        
+        # Downsample the audio to the target rate
+        number_of_samples = round(len(audio_data) * float(self.downsample_rate) / self.sample_rate)
+        downsampled_audio_data = resample(audio_data, number_of_samples).astype(np.int16)
+        
+        # Save the downsampled audio to a file
+        with wave.open(filename, "wb") as wf:
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(2)  # Assuming 16-bit audio
+            wf.setframerate(self.downsample_rate)
+            wf.writeframes(downsampled_audio_data.tobytes())
+
+        print(f"Downsampled audio saved to {filename}")
+        
+         # Print statements to confirm values
+        print(f"Original sample rate: {self.sample_rate} Hz")
+        print(f"Target downsample rate: {self.downsample_rate} Hz")
+        print(f"Original number of samples: {len(audio_data)}")
+        print(f"Downsampled number of samples: {len(downsampled_audio_data)}")
+        print(f"First 10 samples of original audio: {audio_data[:10]}")
+        print(f"First 10 samples of downsampled audio: {downsampled_audio_data[:10]}")
+
+        
+        return downsampled_audio_data
+
+    def process_audio_downsample(self, frames):
+        downsampled_audio_data = self.downsample_audio(frames)
+        
+        # Use a 30-second chunk size for processing at the downsampled rate
+        chunk_duration_seconds = 30  # 30 seconds
+        chunk_size_samples = int(chunk_duration_seconds * self.downsample_rate)
+        
+        texts = []
+        
+        for i in range(0, len(downsampled_audio_data), chunk_size_samples):
+            chunk_frames = downsampled_audio_data[i: i + chunk_size_samples]
+            audio = np.array(chunk_frames).astype(np.float32) / 32768.0
+            audio = whisper.pad_or_trim(audio)
+            mel = whisper.log_mel_spectrogram(audio).to(self.model.device)
+            options = whisper.DecodingOptions(fp16=False, language='en')
+            result = whisper.decode(self.model, mel, options)
+            
+            if result.text.strip():
+                texts.append(result.text)
+                print(f"Processed chunk: {result.text}")
+                
+        return " ".join(texts)
+
 
     def play_audio_in_background(self, filename):
         # This method starts the audio playback in a separate thread
@@ -124,7 +186,14 @@ class SpeechDJ:
                         print("Saving audio...")
                         self.save_audio(filename, frames)
                     print("Finished recording. Processing audio...")
-                    text = self.process_audio(frames)
+
+                    # # Downsample the recorded audio
+                    # downsampled_audio = self.downsample_audio(frames)
+                    # downsampled_frames = [downsampled_audio.tobytes()]
+
+                    # Process the downsampled audio
+                    # text = self.process_audio(frames)
+                    text = self.process_audio_downsample(frames)
                     print(f"\nRecognized text: \n {text} \n\n")
                     stream.stop_stream()
                     stream.close()
@@ -142,7 +211,7 @@ class SpeechDJ:
                             with wave.open(song_filename, "wb") as wf:
                                 wf.setnchannels(1)
                                 wf.setsampwidth(2)
-                                wf.setframerate(self.sample_rate)
+                                wf.setframerate(self.downsample_rate)  # Save at the downsampled rate
                                 wf.writeframes(audio.data)
 
                             # Play the song in the background while continuing the loop
@@ -154,3 +223,4 @@ class SpeechDJ:
                     energy_values = []
                     is_ready_to_record = False
                     is_recording = False
+
