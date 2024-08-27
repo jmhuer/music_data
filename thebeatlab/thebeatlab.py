@@ -47,34 +47,41 @@ class RecordStore:
         return df[['artist', 'songname', 'sectiontype', 'filename']].copy()
 
     def load_music_data(self, json_file_path):
-        try:
-            with open(json_file_path, 'r', encoding='utf-8-sig') as file:
-                data = json.load(file)
-        except FileNotFoundError:
-            print("Error: The file was not found.")
-            return None, None, None
-        except json.JSONDecodeError:
-            print("Error: There was an issue decoding the JSON file.")
-            return None, None, None
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-            return None, None, None
+            try:
+                with open(json_file_path, 'r', encoding='utf-8-sig') as file:
+                    data = json.load(file)
+            except FileNotFoundError:
+                print("Error: The file was not found.")
+                return None, None, None
+            except json.JSONDecodeError:
+                print("Error: There was an issue decoding the JSON file.")
+                return None, None, None
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+                return None, None, None
 
-        chords = [Chord(**chord_data) for chord_data in data.get('chords', [])]
-        notes = [Note(**note_data) for note_data in data.get('notes', [])]
+            chords = [Chord(**chord_data) for chord_data in data.get('chords', [])]
+            notes = [Note(**note_data) for note_data in data.get('notes', [])]
 
-        key = data.get('keys', [{}])[0]
-        scale = key.get('scale')
-        tonic = key.get('tonic')
+            key = data.get('keys', [{}])[0]
+            scale = key.get('scale')
+            tonic = key.get('tonic')
 
-        meter = data.get('meters', [{}])[0]
-        meter_beat = meter.get('beat')
-        numBeats = meter.get('numBeats')
-        beatUnit = meter.get('beatUnit')
+            tempo = data.get('tempos', [{}])[0]
+            tempo_beat = tempo.get('beat')
+            bpm = tempo.get('bpm')
+            swing_factor = tempo.get('swingFactor')
+            swing_beat = tempo.get('swingBeat')
 
-        song = Song(f"{tonic}-{scale}", scale, tonic, chords, meter_beat, numBeats, beatUnit, notes)
+            meter = data.get('meters', [{}])[0]
+            meter_beat = meter.get('beat')
+            num_beats = meter.get('numBeats')
+            beat_unit = meter.get('beatUnit')
 
-        return chords, notes, song
+            time = Time(tempo_beat, bpm, swing_factor, swing_beat, meter_beat, num_beats, beat_unit)
+            song = Song(f"{tonic}-{scale}", scale, tonic, chords, time, notes)
+
+            return chords, notes, song
 
     def find_best_match(self, artist=None, songname=None, sectiontype=None):
         # Prioritize exact matches if all fields are provided
@@ -141,20 +148,19 @@ import json
 import os
 
 class Song:
-    def __init__(self,key,scale,tonic,chords,meter_beat,numBeats,beatUnit,notes, **kwargs):
+    def __init__(self,key,scale,tonic,chords,time,notes,**kwargs):
         # self.absolute_root = self.note_to_midi(key)
         self.key = key
         self.scale = scale
         self.tonic = tonic
-        self.meter_beat = meter_beat
-        self.numBeats = numBeats
-        self.beatUnit = beatUnit
+        self.time = time
         self.allowed_keys_list = self.generated_keys_list()
         print(self.allowed_keys_list)
         self.chords = chords
         self.notes = notes
         self.generated_absolute_chords()
         self.generated_absolute_notes()
+        
     def generated_keys_list(self):
         oct_start = 0
         oct_end = 10
@@ -168,6 +174,7 @@ class Song:
         for c in self.notes:
             if not c.isRest:
                 absolute_note = self.sd_to_midi(c.sd,c.octave) 
+                # print(absolute_note)
                 c.absolute_note_position.append(absolute_note)
             
     def generated_absolute_chords(self):
@@ -176,12 +183,22 @@ class Song:
             absolute_root = self.note_to_midi(self.tonic) 
             root_abs_position = self.allowed_keys_list.index(absolute_root) + c.root - 1 
             c.absolute_chord_position = [self.allowed_keys_list[root_abs_position],self.allowed_keys_list[root_abs_position+2],self.allowed_keys_list[root_abs_position+4]]
+    
     def sd_to_midi(self, sd, octave):
-        root_note = self.note_to_midi(self.tonic) 
-        lowest_octave_root = (root_note % 12) + 60 
-        root_note_abs_position = self.allowed_keys_list.index(lowest_octave_root)
-        note =  self.allowed_keys_list[root_note_abs_position + int(sd) + (octave * 12)]
+        root_note = self.note_to_midi(self.tonic)
+        middle_octave_root = (root_note % 12) + 60
+        root_note_abs_position = self.allowed_keys_list.index(middle_octave_root)
+        
+        # Check if the sd starts with '#' and adjust base_sd accordingly
+        issharp = sd[0] == '#'
+        isflat = sd[0] == 'b'
+        sd = int(sd[1:]) if issharp or isflat else int(sd)
+        
+        # Calculate the base note in the scale
+        note = self.allowed_keys_list[root_note_abs_position + sd - 1] + int(issharp) - int(isflat) + (octave * 12) # Add a semitone (1 MIDI value) if sharp
+        
         return note
+
     def get_key_shift(self, mode):
         ks = {
             "major" : [0, 2, 4, 5, 7, 9, 11],
@@ -221,7 +238,16 @@ class Song:
     def __repr__(self):
         return f"key: {self.scale} \t {self.tonic}"
 
-
+class Time:
+    def __init__(self, tempo_beat, bpm, swing_factor, swing_beat, meter_beat, num_beats, beat_unit):
+        self.tempo = tempo_beat
+        self.bpm = bpm
+        self.swing_factor = swing_factor
+        self.swing_beat = swing_beat
+        self.meter_beat = meter_beat
+        self.num_beats = num_beats
+        self.beat_unit = beat_unit
+        
 class Chord:
     def __init__(self, root, beat, duration, type, inversion, applied, adds, omits, alterations, suspensions, substitutions, pedal, alternate, borrowed, isRest, recordingEndBeat=None):
         self.root = root
@@ -266,42 +292,45 @@ class Note:
 
 import pretty_midi
 import IPython.display
-
 class Player:
     def __init__(self, bpm=85, instrument_program=42, velocity=100):
-        self.bpm = bpm
-        self.tempo = 60 / bpm  # seconds per beat
         self.velocity = velocity
+        # Initialize PrettyMIDI with a default BPM
         self.pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+        # Initialize the instrument and add it to PrettyMIDI
         self.instrument = pretty_midi.Instrument(program=instrument_program, is_drum=False, name='piano')
         self.pm.instruments.append(self.instrument)
+        self.song = None
 
     def load_song(self, song):
         self.song = song
+        # Update the tempo based on the song's Time object
         self._process_song()
 
     def _process_song(self):
         self._add_chords_to_instrument()
         self._add_notes_to_instrument()
+        self.pm.initial_tempo = self.song.time.bpm
+
+    def _beat_to_seconds(self, beat):
+        # Convert beat to seconds using the formula: seconds = (60 / bpm) * beat
+        return (60 / self.song.time.bpm) * beat
 
     def _add_chords_to_instrument(self):
         for c in self.song.chords:
-            duration = c.duration
-            numBeats = 4
-            for i in range((duration + numBeats - 1) // numBeats):  # Ceiling division
-                start = c.beat + i * numBeats
-                end = min(start + numBeats, c.beat + duration)  # Don't exceed the original duration
-                for pitch in c.absolute_chord_position:
-                    start_time = start * self.tempo  # Convert beats to seconds
-                    end_time = end * self.tempo  # Convert beats to seconds
-                    self.instrument.notes.append(pretty_midi.Note(self.velocity, pitch, start_time, end_time))
+            start_time = self._beat_to_seconds(c.beat)
+            end_time = self._beat_to_seconds(c.beat + c.duration)
+            
+            # Add each note in the chord to the instrument
+            for pitch in c.absolute_chord_position:
+                self.instrument.notes.append(pretty_midi.Note(self.velocity, pitch, start_time, end_time))
 
     def _add_notes_to_instrument(self):
         for c in self.song.notes:
-            start = c.beat * self.tempo  # Convert beat to seconds
-            end = (c.beat + c.duration) * self.tempo  # Convert beat + duration to seconds
+            start_time = self._beat_to_seconds(c.beat)
+            end_time = self._beat_to_seconds(c.beat + c.duration)
             if len(c.absolute_note_position) > 0:
-                self.instrument.notes.append(pretty_midi.Note(self.velocity, c.absolute_note_position[0], start, end))
+                self.instrument.notes.append(pretty_midi.Note(self.velocity - 40, c.absolute_note_position[0], start_time, end_time))  # Notes quieter
 
     def play_piano(self, fs=16000):
         return IPython.display.Audio(self.pm.synthesize(fs=fs), rate=fs)
