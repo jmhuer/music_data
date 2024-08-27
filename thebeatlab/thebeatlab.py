@@ -313,8 +313,16 @@ class Player:
         self.pm.initial_tempo = self.song.time.bpm
 
     def _beat_to_seconds(self, beat):
-        # Convert beat to seconds using the formula: seconds = (60 / bpm) * beat
-        return (60 / self.song.time.bpm) * beat
+        # Convert beat to seconds considering the tempo, meter, and swing factor
+        seconds_per_beat = (60 / self.song.time.bpm)
+        
+        # Adjust for swing: If the current beat is a swing beat, modify timing
+        if beat % self.song.time.swing_beat == 0:
+            seconds_per_beat *= (1 + self.song.time.swing_factor)
+        else:
+            seconds_per_beat *= (1 - self.song.time.swing_factor)
+        
+        return seconds_per_beat * beat
 
     def _add_chords_to_instrument(self):
         for c in self.song.chords:
@@ -334,6 +342,7 @@ class Player:
 
     def play_piano(self, fs=16000):
         return IPython.display.Audio(self.pm.synthesize(fs=fs), rate=fs)
+
 
 #Define your structured output model
 class SongRequest(BaseModel):
