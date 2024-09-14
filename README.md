@@ -13,7 +13,7 @@ This is how you interact
 To just play a random song .. notice the input_text = f"Play the song {random_songname}" then dj.process_request processes the text by asking gpt for a structured input. Structure is defined by SongRequest. See code below 
 
 
-'''
+
 
     #Define your structured output model
     class SongRequest(BaseModel):
@@ -66,7 +66,7 @@ To just play a random song .. notice the input_text = f"Play the song {random_so
             print("No matching song found.")
             return None
 
-'''
+
 
 
 Now to run this see code below for how we initialize the classes. overall.csv is the list of songs we have in the data. 
@@ -74,7 +74,7 @@ Note there is problem.. the overall.csv is messy and the name of the songs are n
 
 Anyways, see below for how we run from a given input_text
 
-'''
+
 
     # Initialize the RecordStore
     record_store = RecordStore("overall.csv")
@@ -105,12 +105,12 @@ Anyways, see below for how we run from a given input_text
         # If running in an environment that supports audio playback, like Jupyter:
         if audio:
             display(audio)
-'''
+
 
 
 This other part here is how you use speach to request a song. But you will need a microphone with a mute button... this is because I didnt want to write code for trigger words. so mute button has a very clear signal that we are no longer listening for input. The speach thing isnt too important for us, but if you want to try it I can ship you a microphone with mute button - I have a few. 
 
-'''
+
 
     # Initialize the SpeechDJ
     speech_dj = SpeechDJ("overall.csv", authenticate=True)
@@ -118,7 +118,7 @@ This other part here is how you use speach to request a song. But you will need 
     # Use the converse method to record audio, process it, and play the song
     speech_dj.converse("output.wav", input_device_index=11, save_last_audio=False)
 
-'''
+
 
 It uses a local whisper model to process speach. it essentially creates the input_text from speach then processes the song the same way as the example above this one. 
 
