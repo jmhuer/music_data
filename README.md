@@ -5,13 +5,74 @@ You can see the json files in data.zip
 
 To try out playing a json file look at the jupyter notebook: read_songsv3.ipynb
 This uses the module "beatlab" that handles all the music processing. Its actually quite simple considering it can basically play any song in any key and tempo. Thats the great thing about this json format 
-
 (Note there is a log of junk in this repo I havent cleaned it up. You will find some code realted to pygeometric because I have ran some experiments around GNNs for music applications. A different project for another day)
 
 
 This is how you interact 
 
-To just play a random song .. notice the input_text = f"Play the song {random_songname}" the dj.process request is just a palce holder for when we eventually use a language model to process the request. Right now it just uses some basic regex to extract the song name from the input_text. Note that the regex based extraction of input_text sometimes fucks up. 
+To just play a random song .. notice the input_text = f"Play the song {random_songname}" then dj.process_request processes the text by asking gpt for a structured input. Structure is defined by SongRequest. See code below 
+
+
+'''
+
+    #Define your structured output model
+    class SongRequest(BaseModel):
+        artist: str
+        songname: str
+        sectiontype: str
+
+    def process_request(self, input_text: str) -> Song:
+        # System message to instruct the model on how to behave
+        system_message = {
+            "role": "system",
+            "content": (
+                "You are a helpful assistant. When given a request for a song, "
+                "you should attempt to understand the artist, song name, and section type, "
+                "even if the user makes a typo or uses a non-standard name. Correct obvious mistakes "
+                "and extract the correct structured data."
+            )
+        }
+
+        # Define the messages including the system message and user input
+        messages = [
+            system_message,
+            {"role": "user", "content": input_text},
+        ]
+
+        # Create an OpenAI client instance
+        client = openai.OpenAI()
+
+        # Call the OpenAI API to get structured output
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-2024-08-06",
+            messages=messages,
+            response_format=SongRequest,  # Use the Pydantic model directly here
+        )
+
+        # Extract the structured response content
+        song_request = completion.choices[0].message.parsed
+
+        # Use the extracted information to retrieve the song from the RecordStore
+        song = self.record_store.get_song(
+            artist=song_request.artist,
+            songname=song_request.songname,
+            sectiontype=song_request.sectiontype
+        )
+
+        if song:
+            print("Song object loaded successfully.")
+            return song
+        else:
+            print("No matching song found.")
+            return None
+
+'''
+
+
+Now to run this see code below for how we initialize the classes. overall.csv is the list of songs we have in the data. 
+Note there is problem.. the overall.csv is messy and the name of the songs are well organzied. For example a_team_1_verse.json. So sometiems the song will not be found because the llm is looking for a team and it doesnt match a_team_1_verse. We need to imporve the retrival approach. 
+
+Anyways, see below for how we run from a given input_text
 
 '''
 
@@ -47,7 +108,7 @@ To just play a random song .. notice the input_text = f"Play the song {random_so
 '''
 
 
-This other part here is how you use speach to request a song. 
+This other part here is how you use speach to request a song. But you will need a microphone with a mute button... this is because I didnt want to write code for trigger words. so mute button has a very clear signal that we are no longer listening for input. The speach thing isnt too important for us, but if you want to try it I can ship you a microphone with mute button - I have a few. 
 
 '''
 
