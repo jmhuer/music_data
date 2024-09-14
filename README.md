@@ -110,6 +110,9 @@ Anyways, see below for how we run from a given input_text
 
 This other part here is how you use speach to request a song. But you will need a microphone with a mute button... this is because I didnt want to write code for trigger words. so mute button has a very clear signal that we are no longer listening for input. The speach thing isnt too important for us, but if you want to try it I can ship you a microphone with mute button - I have a few. 
 
+Also "output.wav" is incase you want to save the music the DJ plays. 
+
+
 
 
     # Initialize the SpeechDJ
