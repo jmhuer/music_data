@@ -9,6 +9,7 @@ This uses the module "beatlab" that handles all the music processing. Its actual
 This is how you interact 
 
 To just play a random song .. notice the input_text = f"Play the song {random_songname}" then dj.process_request processes the text by asking gpt for a structured input. Structure is defined by SongRequest. See code below 
+Notice you will need an authentication key for open ai. I can send you the one i use. 
 
 
 
