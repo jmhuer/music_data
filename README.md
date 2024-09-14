@@ -4,7 +4,7 @@
 You can see the json files in data.zip 
 
 To try out playing a json file look at the jupyter notebook: read_songsv3.ipynb
-This uses the module "beatlab" that handles all the music processing, most other files outside of that fodler a junk or backup. Will remove them soon. Overall look at beatlab/ Its actually quite simple considering it can basically play any song in any key and tempo. Thats the great thing about this json format 
+This uses the module "beatlab" that handles all the music processing, most other files outside of that folder are junk or backup. Will remove them soon. Overall look at beatlab/ Its actually quite simple considering it can basically play any song in any key and tempo. Thats the great thing about this json format 
 
 This is how you interact 
 
