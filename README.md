@@ -5,8 +5,6 @@ You can see the json files in data.zip
 
 To try out playing a json file look at the jupyter notebook: read_songsv3.ipynb
 This uses the module "beatlab" that handles all the music processing. Its actually quite simple considering it can basically play any song in any key and tempo. Thats the great thing about this json format 
-(Note there is a log of junk in this repo I havent cleaned it up. You will find some code realted to pygeometric because I have ran some experiments around GNNs for music applications. A different project for another day)
-
 
 This is how you interact 
 
@@ -124,6 +122,12 @@ Also "output.wav" is incase you want to save the music the DJ plays.
 
 
 It uses a local whisper model to process speach. it essentially creates the input_text from speach then processes the song the same way as the example above this one. 
+
+----
+Note there is a log of junk in this repo I havent cleaned it up. You will find some code realted to pygeometric because I have ran some experiments around GNNs for music applications. A different project for another day.. 
+Also you will also see pymidi_short/ 
+This has an SAM application for deploying a LLM wrapper. Ive been using it via telegram. I start a chat with a bot that I can chat with. 
+
 
 
 ## TODO
