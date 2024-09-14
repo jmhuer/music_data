@@ -64,10 +64,19 @@ It uses a local whisper model to process speach. it essentially creates the inpu
 
 ## TODO
 - We need a template web LLM chat that will fit out needs [Nithish]
+  > Update: <add here>
+
 - We need to finish this code base .. I need to extend functionality to all differrent chords 'types' right now the all chords use the standard chord type. [juan]
+  > Update: <add here>
+
 - We need a LLM based appraoch to process the input_text with structure. We need to find a good way to map input_text to actions: play, modify, answer general questions, etc. This might be a prompting thing + some tools to get structured outputs
+  > Update: <add here>
+
 - We need to finetune the LLM to understand and generate Json files like the ones used here. This will require finetunning.
-- We need to figure out how the backend will work. I think tone.js can be used to substitude the python code here. But we need to think about the architecture 
+  > Update: <add here>
+
+- We need to figure out how the backend will work. I think tone.js can be used to substitude the python code here. But we need to think about the architecture
+  > Update: <add here>
 
 
 
