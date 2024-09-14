@@ -70,7 +70,7 @@ To just play a random song .. notice the input_text = f"Play the song {random_so
 
 
 Now to run this see code below for how we initialize the classes. overall.csv is the list of songs we have in the data. 
-Note there is problem.. the overall.csv is messy and the name of the songs are well organzied. For example a_team_1_verse.json. So sometiems the song will not be found because the llm is looking for a team and it doesnt match a_team_1_verse. We need to imporve the retrival approach. 
+Note there is problem.. the overall.csv is messy and the name of the songs are not well organzied. For example a_team_1_verse.json. So sometiems the song will not be found because the llm is looking for a team and it doesnt match a_team_1_verse. We need to imporve the retrival approach. 
 
 Anyways, see below for how we run from a given input_text
 
